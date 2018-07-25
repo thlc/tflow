@@ -7,15 +7,27 @@ import tempfile
 import sys
 import os
 import sqlite3
+import requests
+import re
+from dateutil.parser import parse
+from bs4 import BeautifulSoup
 
-baseurl = "http://diffusion-numerique.info-routiere.gouv.fr/tipitrafic/TraficMarius/"
+# loglevels
+DEBUG    = 3
+INFO     = 2
+WARNING  = 1
+ERROR    = 0
+
+baseurl = "http://diffusion-numerique.info-routiere.gouv.fr/tipitrafic/"
+args = None
 
 def die(err):
-    print err
+    print(err)
     sys.exit(42)
 
+# fixme level
 def log(level, msg):
-    print msg
+    print(msg)
 
 def init_workdir(args):
     # sqlite + RRD init
@@ -26,6 +38,7 @@ def init_workdir(args):
     conn = sqlite3.connect(args.workdir + '/tflow.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE timestamp (last DATETIME)''')
+    c.execute('''INSERT INTO timestamp (last) VALUES (DATETIME('1970-01-01 00:00:00'))''')
     conn.commit()
     conn.close()
     log(DEBUG, "created SQLite database successfully")
@@ -34,9 +47,37 @@ def init_rrd(args, sensor_name):
     # init args.workdir+"/rrd/"+${sensor_name}.rrd
     True
 
-def fetch_data():
-    # fetch the stuff
-    True
+
+# get the last timestamp that we processed
+def get_last_ts():
+    conn = sqlite3.connect(args.workdir + '/tflow.db')
+    c = conn.cursor()
+    c.execute('''SELECT last FROM timestamp;''') #FIXME
+    r = c.fetchone()
+    conn.commit()
+    conn.close()
+    return parse(r[0])
+
+# fetch all the missing data
+def fetch_data(network = 'TraficMarius'):
+    last_ts = get_last_ts()
+
+    # get all directories from the root
+    basedir_days = get_page_contents(baseurl + network, '/')
+
+    for day in basedir_days:
+        m = re.search('.*/([0-9-_]+)/$', day)
+        if m == None:
+            continue
+        else:
+            day_ts = m.group(1)
+
+# parses the output of an Apache DirectoryIndex page
+# returns an array of links
+def get_page_contents(url, ext):
+    page = requests.get(url, auth=(args.user, args.password)).text
+    soup = BeautifulSoup(page, 'html.parser')
+    return [ url + '/' + node.get('href') for node in soup.find_all('a') if node.get('href').endswith(ext) ]
 
 def process_file():
     # process a single DATEX2 file into RRD
@@ -45,23 +86,24 @@ def process_file():
 
 def main():
     parser = argparse.ArgumentParser(description='Traffic data analyser')
-    parser.add_argument('-u', '--user', help='username', required=True, type=str, action='store')
-    parser.add_argument('-p', '--password', help='password', required=True, type=str, action='store')
+    parser.add_argument('-u', '--user', help='username', type=str, action='store')
+    parser.add_argument('-p', '--password', help='password', type=str, action='store')
     parser.add_argument('-d', '--workdir', default='./data', type=str, action='store')
     parser.add_argument('-I', '--init', action='store_true')
     parser.add_argument('-C', '--catchup', help='catchup with old data', action='store_true')
 
+    global args
     args = parser.parse_args()
 
     if args.init:
-        init_workdir(args)
+        init_workdir()
         sys.exit(0)
 
     if not os.path.isdir(args.workdir):
         log("error: %s doesn't exist" % args.workdir)
         sys.exit(1)
 
-    fetch_data(parser)
+    fetch_data()
 
 if __name__ == "__main__":
     main()
