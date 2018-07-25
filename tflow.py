@@ -9,6 +9,9 @@ import os
 import sqlite3
 import requests
 import re
+import time
+from time import mktime
+from datetime import datetime
 from dateutil.parser import parse
 from bs4 import BeautifulSoup
 
@@ -52,11 +55,33 @@ def init_rrd(args, sensor_name):
 def get_last_ts():
     conn = sqlite3.connect(args.workdir + '/tflow.db')
     c = conn.cursor()
-    c.execute('''SELECT last FROM timestamp;''') #FIXME
+    c.execute('''SELECT last FROM timestamp;''')
     r = c.fetchone()
     conn.commit()
     conn.close()
     return parse(r[0])
+
+def parse_sixmin(sixmin_url):
+    print("working on " + sixmin_url)
+    xml = requests.get(sixmin_url, auth=(args.user, args.password)).text
+
+    sys.exit(0) # tmp
+
+def fetch_day(url, last_ts):
+    print("working on " + url)
+    day = get_page_contents(url, '.xml')
+    for sixmin in day:
+        m = re.search('.*/frmar_DataTR_([0-9-_]+)\.xml$', sixmin)
+        if m == None:
+            continue
+        else:
+            ts = m.group(1)
+            parsed_ts = datetime.fromtimestamp(mktime(time.strptime(ts, "%Y%m%d_%H%M%S")))
+            if parsed_ts > last_ts:
+                parse_sixmin(sixmin)
+            else:
+                print("skipping sixmin " + ts)
+
 
 # fetch all the missing data
 def fetch_data(network = 'TraficMarius'):
@@ -71,6 +96,13 @@ def fetch_data(network = 'TraficMarius'):
             continue
         else:
             day_ts = m.group(1)
+            # 2018-07-25_09
+            parsed_ts = datetime.fromtimestamp(mktime(time.strptime(day_ts, '%Y-%m-%d_%H')))
+            if parsed_ts > last_ts:
+                fetch_day(day, last_ts)
+            else:
+                print("skipping " + day_ts)
+
 
 # parses the output of an Apache DirectoryIndex page
 # returns an array of links
