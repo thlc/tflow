@@ -1,7 +1,13 @@
 tflow -- A Traffic Data analyzer and grapher
 
 
+-- INSTALL
+
+pip3 install rrdtool rfc3339-strict bs4
+
+
 
 -- NOTES
 http://diffusion-numerique.info-routiere.gouv.fr/IMG/pdf/TraficXml-Format-090221_cle0911be.pdf
 
+mvs for marseille: http://diffusion-numerique.info-routiere.gouv.fr/IMG/ods/Marseille-mvs-091223_cle7a9c5e.ods
