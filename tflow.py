@@ -45,7 +45,8 @@ def die(err):
 
 # fixme level
 def log(level, msg):
-    print(msg)
+    if level < DEBUG:
+        print(msg)
 
 def init_workdir():
     # sqlite + RRD init
@@ -77,11 +78,13 @@ def get_last_ts():
 def update_last_ts(ts):
     conn = sqlite3.connect(args.workdir + '/tflow.db')
     c = conn.cursor()
+    log(DEBUG, "updating last_timestamp to %s" % str(ts))
     c.execute("UPDATE timestamp SET last = %s" % str(ts))
     conn.commit()
     conn.close()
 
 def init_rrd(path, ts_start):
+    log(DEBUG, "creating new RRD database (%s)" % path)
     rrdtool.create(path, '-b', ts_start,
                         '-s', '360',
                         'DS:vehicleFlow:GAUGE:360:0:10000',
@@ -119,7 +122,7 @@ def process_measurement(m, ts):
             if m[0] == s_fwy:
                 s_prettyfwy = m[1]
 
-    #print('sensor: %s (%s) flow: %i  occ: %f  speed: %f' % (sensor, s_prettyfwy, flow, occupancy, speed))
+    log(DEBUG, 'sensor: %s (%s) flow: %i  occ: %f  speed: %f' % (sensor, s_prettyfwy, flow, occupancy, speed))
     update_rrd(sensor, ts, flow, occupancy, speed)
 
 # process a single DATEX2 file into RRD
@@ -129,6 +132,7 @@ def process_file(file):
     pub = dom.getElementsByTagName('payloadPublication')[0]
     pubtime = (pub.getElementsByTagName('publicationTime'))[0].firstChild.data
     ts = str(int(strict_rfc3339.rfc3339_to_timestamp(pubtime)))
+    log(INFO, "processing [%s], publication timestamp [%s]" % (file, pubtime))
     print("pubtime: %s" % pubtime)
     for child in pub.childNodes:
         if child.nodeType == child.ELEMENT_NODE and child.tagName == 'siteMeasurements':
@@ -193,18 +197,18 @@ def draw_graph(rrdfile):
     g_range = '2d'
     height = '200'
     width = '400'
-    scale = 2
+    scale = 0.03
     rrdtool.graph(args.workdir + "/graphs/%s.png" % sensor_name,
                     '--end', 'now', '--start', "end-%s" % g_range,
                     '-E', '-N', '-h', height, '-l', '0', '-t', sensor_name,
-                    '-v', 'veh/h', '-X', '0', '-T' '20', '--right-axis', "%s:0" % scale,
+                    '-v', 'veh/h', '-X', '0', '-T' '20', '--right-axis', "%f:0" % scale,
                     '--right-axis-label', 'km/h | %',
 		    "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
 		    "DEF:speed=%s:speed:AVERAGE:step=360" % rrdfile,
                     "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % rrdfile,
 		    'CDEF:scaledFlow=vehicleFlow,10,*',
-		    "CDEF:scaledSpeed=speed,%s,/" % scale,
-                    "CDEF:scaledOccupancy=occupancy,%s,/" % scale,
+		    "CDEF:scaledSpeed=speed,%f,/" % scale,
+                    "CDEF:scaledOccupancy=occupancy,%f,/" % scale,
 		    'VDEF:vehicleAvg=vehicleFlow,AVERAGE',
 		    'VDEF:vehicleMin=vehicleFlow,MINIMUM',
 		    'VDEF:vehicleMax=vehicleFlow,MAXIMUM',
@@ -217,21 +221,21 @@ def draw_graph(rrdfile):
 		    'VDEF:occupancyMin=occupancy,MINIMUM',
 		    'VDEF:occupancyMax=occupancy,MAXIMUM',
 		    'VDEF:occupancyLast=occupancy,LAST',
-		    'LINE1:scaledFlow#0000FF:"vehicleFlow    "',
-		    'LINE1:scaledSpeed#FF0000:"speed    "',
-		    'LINE1:scaledOccupancy#00FF00:"occupancy    \c"',
-		    'GPRINT:vehicleAvg:"avg %4.0lf0 veh/h\t"',
-		    'GPRINT:vehicleMin:"min %4.0lf0 veh/h\t"',
-		    'GPRINT:vehicleMax:"max %4.0lf0 veh/h\t"',
-		    'GPRINT:vehicleLast:"last %4.0lf0 veh/h\l"',
-		    'GPRINT:speedAvg:"avg %4.0lf km/h \t"',
-		    'GPRINT:speedMin:"min %4.0lf km/h \t"',
-		    'GPRINT:speedMax:"max %4.0lf km/h \t"',
-		    'GPRINT:speedLast:"last %4.0lf km/h \l"',
-		    'GPRINT:occupancyAvg:"avg %4.0lf %%\t"',
-		    'GPRINT:occupancyMin:"min %4.0lf %%\t"',
-		    'GPRINT:occupancyMax:"max %4.0lf %%\t"',
-		    'GPRINT:occupancyLast:"last %4.0lf %%      "')
+		    'LINE1:scaledFlow#0000FF:vehicleFlow    ',
+		    'LINE1:scaledSpeed#FF0000:speed    ',
+		    'LINE1:scaledOccupancy#00FF00:occupancy    \c',
+		    'GPRINT:vehicleAvg:avg %4.0lf0 veh/h\t',
+		    'GPRINT:vehicleMin:min %4.0lf0 veh/h\t',
+		    'GPRINT:vehicleMax:max %4.0lf0 veh/h\t',
+		    'GPRINT:vehicleLast:last %4.0lf0 veh/h\l',
+		    'GPRINT:speedAvg:avg %4.0lf km/h \t',
+		    'GPRINT:speedMin:min %4.0lf km/h \t',
+		    'GPRINT:speedMax:max %4.0lf km/h \t',
+		    'GPRINT:speedLast:last %4.0lf km/h \l',
+		    'GPRINT:occupancyAvg:avg %4.0lf %%\t',
+		    'GPRINT:occupancyMin:min %4.0lf %%\t',
+		    'GPRINT:occupancyMax:max %4.0lf %%\t',
+		    'GPRINT:occupancyLast:last %4.0lf %%      ')
 
 def draw_graphs():
     for filename in os.listdir(args.workdir + '/rrd'):
