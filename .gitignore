@@ -1,2 +1,3 @@
 run.sh
 data
+*.sw[a-zA-Z]

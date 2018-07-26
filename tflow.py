@@ -10,6 +10,8 @@ import sqlite3
 import requests
 import re
 import time
+import xml.dom.minidom
+from xml.dom.minidom import parse
 from time import mktime
 from datetime import datetime
 from dateutil.parser import parse
@@ -61,10 +63,31 @@ def get_last_ts():
     conn.close()
     return parse(r[0])
 
-def parse_sixmin(sixmin_url):
+def process_measurement(m, ts):
+    sensor = m.getElementsByTagName('predefinedLocationReference')[0].getAttribute('id')
+    flow = m.getElementsByTagName('vehicleFlowRate')[0].firstChild.data
+    occupancy = m.getElementsByTagName('percentage')[0].firstChild.data 
+    speed = m.getElementsByTagName('speed')[0].firstChild.data 
+
+    print('sensor: %s flow: %s  occ: %s  speed: %s' % (sensor, flow, occupancy, speed))
+
+# process a single DATEX2 file into RRD
+def process_file(file):
+    dom = xml.dom.minidom.parseString(file)
+
+    pub = dom.getElementsByTagName('payloadPublication')[0]
+    pubtime = (pub.getElementsByTagName('publicationTime'))[0].firstChild.data
+    print("pubtime: %s" % pubtime)
+    for child in pub.childNodes:
+        if child.nodeType == child.ELEMENT_NODE and child.tagName == 'siteMeasurements':
+            process_measurement(child, pubtime)
+
+    True
+
+def fetch_sixmin(sixmin_url):
     print("working on " + sixmin_url)
     xml = requests.get(sixmin_url, auth=(args.user, args.password)).text
-
+    process_file(xml)
     sys.exit(0) # tmp
 
 def fetch_day(url, last_ts):
@@ -78,7 +101,7 @@ def fetch_day(url, last_ts):
             ts = m.group(1)
             parsed_ts = datetime.fromtimestamp(mktime(time.strptime(ts, "%Y%m%d_%H%M%S")))
             if parsed_ts > last_ts:
-                parse_sixmin(sixmin)
+                fetch_sixmin(sixmin)
             else:
                 print("skipping sixmin " + ts)
 
@@ -111,9 +134,6 @@ def get_page_contents(url, ext):
     soup = BeautifulSoup(page, 'html.parser')
     return [ url + '/' + node.get('href') for node in soup.find_all('a') if node.get('href').endswith(ext) ]
 
-def process_file():
-    # process a single DATEX2 file into RRD
-    True
 
 
 def main():
