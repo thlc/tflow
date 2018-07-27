@@ -2,6 +2,9 @@
 # coding: utf8
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 
+# Copyright (c) 2018, Thomas Lecomte <thomas@netnix.in>
+# All rights reserved.
+
 import argparse
 import tempfile
 import sys
@@ -36,6 +39,8 @@ INFO     = 2
 WARNING  = 1
 ERROR    = 0
 
+loglevel = INFO
+
 baseurl = "http://diffusion-numerique.info-routiere.gouv.fr/tipitrafic/"
 args = None
 
@@ -45,7 +50,8 @@ def die(err):
 
 # fixme level
 def log(level, msg):
-    if level < DEBUG:
+    global loglevel
+    if level <= loglevel:
         print(msg)
 
 def init_workdir():
@@ -78,8 +84,8 @@ def get_last_ts():
 def update_last_ts(ts):
     conn = sqlite3.connect(args.workdir + '/tflow.db')
     c = conn.cursor()
-    log(DEBUG, "updating last_timestamp to %s" % str(ts))
-    c.execute("UPDATE timestamp SET last = %s" % str(ts))
+    c.execute("UPDATE timestamp SET last = %s" % ts)
+    log(DEBUG, "[update_last_ts] updating to %s" % ts);
     conn.commit()
     conn.close()
 
@@ -132,19 +138,16 @@ def process_file(file):
     pub = dom.getElementsByTagName('payloadPublication')[0]
     pubtime = (pub.getElementsByTagName('publicationTime'))[0].firstChild.data
     ts = str(int(strict_rfc3339.rfc3339_to_timestamp(pubtime)))
-    log(INFO, "processing [%s], publication timestamp [%s]" % (file, pubtime))
-    print("pubtime: %s" % pubtime)
+    update_last_ts(ts)
+    log(INFO, "processing publication, timestamp [%s]" % (pubtime))
     for child in pub.childNodes:
         if child.nodeType == child.ELEMENT_NODE and child.tagName == 'siteMeasurements':
             process_measurement(child, ts)
 
-    True
-
 def fetch_sixmin(sixmin_url):
-    print("working on " + sixmin_url)
+    log(DEBUG, "[fetch_sixmin] fetching %s" % sixmin_url)
     xml = requests.get(sixmin_url, auth=(args.user, args.password)).text
     process_file(xml)
-    #sys.exit(0) # tmp
 
 def fetch_day(url, last_ts):
     print("working on " + url)
@@ -156,10 +159,11 @@ def fetch_day(url, last_ts):
         else:
             ts = m.group(1)
             parsed_ts = int(mktime(time.strptime(ts, "%Y%m%d_%H%M%S")))
+            log(DEBUG, "parsed_ts: %i last_ts: %i" % (parsed_ts, last_ts))
             if parsed_ts > last_ts:
                 fetch_sixmin(sixmin)
             else:
-                print("skipping sixmin " + ts)
+                log(DEBUG, "[fetch_day] skipping sixmin " + ts)
 
 
 # fetch all the missing data
@@ -177,11 +181,11 @@ def fetch_data(network = 'TraficMarius'):
             day_ts = m.group(1)
             # 2018-07-25_09 - we append the minute '59' to get the whole hour
             parsed_ts = int(mktime(time.strptime(day_ts + '-59', '%Y-%m-%d_%H-%M')))
-            if parsed_ts > last_ts:
+            log(DEBUG, "parsed_ts: %i last_ts: %i" % (parsed_ts, last_ts))
+            if parsed_ts >= last_ts:
                 fetch_day(day, last_ts)
-                update_last_ts(parsed_ts)
             else:
-                print("skipping " + day_ts)
+                log(DEBUG, "[fetch_data] skipping " + day_ts)
 
 
 # parses the output of an Apache DirectoryIndex page
@@ -200,7 +204,8 @@ def draw_graph(rrdfile):
     scale = 0.03
     rrdtool.graph(args.workdir + "/graphs/%s.png" % sensor_name,
                     '--end', 'now', '--start', "end-%s" % g_range,
-                    '-E', '-N', '-h', height, '-l', '0', '-t', sensor_name,
+                    '-E', '-N', '-h', height, '-l', '0', '-t',
+                    sensor_name + ' | ' + str(time.strftime("%Y-%m-%d %H:%M", time.localtime())),
                     '-v', 'veh/h', '-X', '0', '-T' '20', '--right-axis', "%f:0" % scale,
                     '--right-axis-label', 'km/h | %',
 		    "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
@@ -235,11 +240,12 @@ def draw_graph(rrdfile):
 		    'GPRINT:occupancyAvg:avg %4.0lf %%\t',
 		    'GPRINT:occupancyMin:min %4.0lf %%\t',
 		    'GPRINT:occupancyMax:max %4.0lf %%\t',
-		    'GPRINT:occupancyLast:last %4.0lf %%      ')
+		    'GPRINT:occupancyLast:last %4.0lf %%     ')
 
 def draw_graphs():
     for filename in os.listdir(args.workdir + '/rrd'):
         if filename.endswith('.rrd'):
+            log(DEBUG, "[draw_graphs] drawing %s" % filename)
             draw_graph(args.workdir + '/rrd/' + filename)
         else:
             continue
@@ -253,9 +259,14 @@ def main():
     parser.add_argument('-I', '--init', action='store_true')
     parser.add_argument('-C', '--catchup', help='catchup with old data', action='store_true')
     parser.add_argument('-g', '--graph', help='draw the graph', action='store_true')
+    parser.add_argument('-D', '--debug', help='debug', action='store_true')
 
     global args
     args = parser.parse_args()
+
+    global loglevel
+    if args.debug:
+        loglevel = DEBUG
 
     if args.init:
         init_workdir()
