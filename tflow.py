@@ -195,14 +195,28 @@ def get_page_contents(url, ext):
     soup = BeautifulSoup(page, 'html.parser')
     return [ url + '/' + node.get('href') for node in soup.find_all('a') if node.get('href').endswith(ext) ]
 
-def draw_graph(rrdfile):
-    m = re.search('(.*)\.rrd$', os.path.basename(rrdfile))
-    sensor_name = m.group(1)
+def gen_live_stats(rrdfile, sensor_name):
+    m = rrdtool.graph('/dev/null', '--end', 'now', '--start', 'end-1h',
+                  "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
+                  "DEF:speed=%s:speed:AVERAGE:step=360" % rrdfile,
+                  "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % rrdfile,
+                  "VDEF:vehicleLast=vehicleFlow,LAST",
+                  "VDEF:occupancyLast=occupancy,LAST",
+                  "VDEF:speedLast=speed,LAST",
+                  "PRINT:vehicleLast:%.0lf",
+                  "PRINT:occupancyLast:%.0lf",
+                  "PRINT:speedLast:%.0lf")
+
+    # m == (0, 0, ['289', '13', '75'])
+    with open(args.outputdir + '/data/' + sensor_name, 'w') as f:
+        f.write("%s %s %s\n" % (m[2][0], m[2][1], m[2][2]))
+
+def draw_graph(rrdfile, sensor_name):
     g_range = '2d'
     height = '200'
     width = '400'
     scale = 0.03
-    rrdtool.graph(args.workdir + "/graphs/%s.png" % sensor_name,
+    rrdtool.graph(args.outputdir + "/graphs/%s.png" % sensor_name,
                     '--end', 'now', '--start', "end-%s" % g_range,
                     '-E', '-N', '-h', height, '-l', '0', '-t',
                     sensor_name + ' | ' + str(time.strftime("%Y-%m-%d %H:%M", time.localtime())),
@@ -245,8 +259,13 @@ def draw_graph(rrdfile):
 def draw_graphs():
     for filename in os.listdir(args.workdir + '/rrd'):
         if filename.endswith('.rrd'):
+            fullpath = args.workdir + '/rrd/' + filename;
+            m = re.search('(.*)\.rrd$', filename)
+            sensor_name = m.group(1)
             log(DEBUG, "[draw_graphs] drawing %s" % filename)
-            draw_graph(args.workdir + '/rrd/' + filename)
+            draw_graph(fullpath, sensor_name)
+            log(DEBUG, "[draw_graphs] gen_live_stats %s" % filename)
+            gen_live_stats(fullpath, sensor_name)
         else:
             continue
 
@@ -260,6 +279,7 @@ def main():
     parser.add_argument('-C', '--catchup', help='catchup with old data', action='store_true')
     parser.add_argument('-g', '--graph', help='draw the graph', action='store_true')
     parser.add_argument('-D', '--debug', help='debug', action='store_true')
+    parser.add_argument('-o', '--outputdir', help='output dir for graphs and stats', action='store', type=str)
 
     global args
     args = parser.parse_args()
