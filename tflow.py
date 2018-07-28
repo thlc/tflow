@@ -261,7 +261,7 @@ def draw_graphs():
         if filename.endswith('.rrd'):
             fullpath = args.workdir + '/rrd/' + filename;
             m = re.search('(.*)\.rrd$', filename)
-            sensor_name = m.group(1)
+            sensor_name = m.group(1).upper()
             log(DEBUG, "[draw_graphs] drawing %s" % filename)
             draw_graph(fullpath, sensor_name)
             log(DEBUG, "[draw_graphs] gen_live_stats %s" % filename)
@@ -277,7 +277,8 @@ def main():
     parser.add_argument('-d', '--workdir', default='./data', type=str, action='store')
     parser.add_argument('-I', '--init', action='store_true')
     parser.add_argument('-C', '--catchup', help='catchup with old data', action='store_true')
-    parser.add_argument('-g', '--graph', help='draw the graph', action='store_true')
+    parser.add_argument('-g', '--graph', help='draw graphs', action='store_true')
+    parser.add_argument('-G', '--graphonly', help='draw graphs only', action='store_true')
     parser.add_argument('-D', '--debug', help='debug', action='store_true')
     parser.add_argument('-o', '--outputdir', help='output dir for graphs and stats', action='store', type=str)
 
@@ -296,10 +297,11 @@ def main():
         log("error: %s doesn't exist" % args.workdir)
         sys.exit(1)
 
+    if not args.graphonly:
+        fetch_data()
+
     if args.graph:
         draw_graphs()
-    else:
-        fetch_data()
 
 if __name__ == "__main__":
     main()

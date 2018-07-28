@@ -20,8 +20,7 @@ def process_placemark(sensor):
     name = sensor.getElementsByTagName('name')[0].firstChild.data
     coords = sensor.getElementsByTagName('coordinates')[0].firstChild.data.strip()
 
-    m = re.search('([A-Z][0-9])([A-Z])', name)
-    realname = "L01.M%s13.%s" % (m.group(1), m.group(2))
+    realname = "L01.%s" % name.strip()
 
 # A502 1=aubagne 2=marseille
 # A51  1=aix 2=marseille
@@ -32,15 +31,16 @@ def process_placemark(sensor):
 # A55L  1=martigues 2=marseille
 
 
-    print("%s1: %s" % (realname, coords))
-    print("%s2: %s" % (realname, coords))
+    print("{\"%s\": \"%s\"}," % (realname, coords))
 
 
 def parse_kml(file):
     dom = xml.dom.minidom.parse(file)
 
+    print('{ "sensors": [')
     for sensor in dom.getElementsByTagName('Placemark'):
         process_placemark(sensor)
+    print('] }')
 
 def main():
     parser = argparse.ArgumentParser(description='Traffic data analyser')
