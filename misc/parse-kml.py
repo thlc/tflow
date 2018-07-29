@@ -31,16 +31,24 @@ def process_placemark(sensor):
 # A55L  1=martigues 2=marseille
 
 
-    print("{\"%s\": \"%s\"}," % (realname, coords))
+    sys.stdout.write("{\"%s\": \"%s\"}" % (realname, coords))
 
 
 def parse_kml(file):
     dom = xml.dom.minidom.parse(file)
 
-    print('{ "sensors": [')
-    for sensor in dom.getElementsByTagName('Placemark'):
+    sys.stdout.write('{ "sensors": [' + "\n")
+    sensors = dom.getElementsByTagName('Placemark')
+    i = 0
+    for sensor in sensors:
         process_placemark(sensor)
-    print('] }')
+        i = i + 1
+        # JSON is pretty pedantic - no comma on last array element
+        if i < len(sensors):
+            sys.stdout.write(",\n")
+        else:
+            sys.stdout.write("\n")
+    sys.stdout.write("] }\n")
 
 def main():
     parser = argparse.ArgumentParser(description='Traffic data analyser')
