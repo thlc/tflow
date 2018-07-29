@@ -5,7 +5,38 @@ var plotlayers=[];
 
 function makeSensor(map, sensor_name, lat, lon) {
   var pos = new L.LatLng(lat, lon);
-  var c = new L.circle(pos, { "radius": 20 })
+  var request = new XMLHttpRequest();
+  var color = '#aaaaaa';
+
+  // FIXME: single file for all sensors, loaded once, async + id.
+  // THIS IS WAY TOO SLOW!!!
+  request.open('GET', 'data/' + sensor_name, false);
+  request.send(null);
+
+  console.log("request.status=" + request.status);
+  if (request.status == 200) {
+    var response = JSON.parse(request.responseText);
+    var data = response[sensor_name];
+
+    if (data['occupancy'] > 10) {
+      color = '#ff0000';
+    } else if (data['occupancy'] > 5) {
+      color = '#ffff00';
+    }
+
+    // actual speed takes precedence over occupancy
+    if (data['speed'] > 70) {
+      color = '#00aa00';
+    } else if (data['speed'] > 40) {
+      color = '#774422';
+    } else if (data['speed'] == 0) {
+      color = '#dddddd'; // no data?
+    }
+    console.log("color:"+color)
+  }
+
+  console.log("color_real:"+color)
+  var c = new L.circle(pos, { "radius": 20, "color": color })
   c.bindPopup("<img src=\"/~thomas/tflow/graphs/" + sensor_name + ".png\"/>");
   c.on('mouseover', function(e) { this.openPopup(); });
   c.on('mouseout',  function(e) { this.closePopup(); });
@@ -40,10 +71,10 @@ function initmap() {
   var xmlhttp = new XMLHttpRequest();
   var url = "sensors.json";
 
+  xmlhttp.responseType = 'json';
   xmlhttp.onreadystatechange = function () {
     if (this.readyState == 4 && this.status == 200) {
-      var response = JSON.parse(this.responseText);
-      initSensors(map, response.sensors);
+      initSensors(map, this.response.sensors);
     }
   };
 
