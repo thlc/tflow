@@ -195,21 +195,35 @@ def get_page_contents(url, ext):
     soup = BeautifulSoup(page, 'html.parser')
     return [ url + '/' + node.get('href') for node in soup.find_all('a') if node.get('href').endswith(ext) ]
 
-def gen_live_stats(rrdfile, sensor_name):
-    m = rrdtool.graph('/dev/null', '--end', 'now', '--start', 'end-1h',
-                  "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
-                  "DEF:speed=%s:speed:AVERAGE:step=360" % rrdfile,
-                  "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % rrdfile,
-                  "VDEF:vehicleLast=vehicleFlow,LAST",
-                  "VDEF:occupancyLast=occupancy,LAST",
-                  "VDEF:speedLast=speed,LAST",
-                  "PRINT:vehicleLast:%.0lf",
-                  "PRINT:occupancyLast:%.0lf",
-                  "PRINT:speedLast:%.0lf")
+def gen_live_stats():
+    i = 0
+    f = open(args.outputdir + '/data/sensors.json', 'w') or die("unable to open %s/data/sensors.json" % args.outputdir)
+    f.write('{ "sensors": [\n')
+    d = os.listdir(args.workdir + '/rrd')
 
-    # m == (0, 0, ['289', '13', '75'])
-    with open(args.outputdir + '/data/' + sensor_name, 'w') as f:
-        f.write("%s %s %s\n" % (m[2][0], m[2][1], m[2][2]))
+    for filename in d:
+        i = i + 1
+        if not filename.endswith('.rrd'):
+            continue
+        fullpath = args.workdir + '/rrd/' + filename;
+        m = re.search('(.*)\.rrd$', filename)
+        sensor_name = m.group(1).upper()
+        m = rrdtool.graph('/dev/null', '--end', 'now', '--start', 'end-1h',
+                "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % fullpath,
+                "DEF:speed=%s:speed:AVERAGE:step=360" % fullpath,
+                "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % fullpath,
+                "VDEF:vehicleLast=vehicleFlow,LAST",
+                "VDEF:occupancyLast=occupancy,LAST",
+                "VDEF:speedLast=speed,LAST",
+                "PRINT:vehicleLast:%.0lf",
+                "PRINT:occupancyLast:%.0lf",
+                "PRINT:speedLast:%.0lf")
+
+        # m == (0, 0, ['289', '13', '75'])
+        f.write("  { \"sensorName\": \"" + sensor_name + "\", \"vehicleFlow\": \"%s\", \"occupancy\": \"%s\", \"speed\": \"%s\" }%s\n" % (m[2][0], m[2][1], m[2][2], "" if i == len(d) else ","))
+
+    f.write("] }\n")
+    f.close()
 
 def draw_graph(rrdfile, sensor_name):
     g_range = '2d'
@@ -217,57 +231,54 @@ def draw_graph(rrdfile, sensor_name):
     width = '400'
     scale = 0.03
     rrdtool.graph(args.outputdir + "/graphs/%s.png" % sensor_name,
-                    '--end', 'now', '--start', "end-%s" % g_range,
-                    '-E', '-N', '-h', height, '-l', '0', '-t',
-                    sensor_name + ' | ' + str(time.strftime("%Y-%m-%d %H:%M", time.localtime())),
-                    '-v', 'veh/h', '-X', '0', '-T' '20', '--right-axis', "%f:0" % scale,
-                    '--right-axis-label', 'km/h | %',
-		    "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
-		    "DEF:speed=%s:speed:AVERAGE:step=360" % rrdfile,
-                    "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % rrdfile,
-		    'CDEF:scaledFlow=vehicleFlow,10,*',
-		    "CDEF:scaledSpeed=speed,%f,/" % scale,
-                    "CDEF:scaledOccupancy=occupancy,%f,/" % scale,
-		    'VDEF:vehicleAvg=vehicleFlow,AVERAGE',
-		    'VDEF:vehicleMin=vehicleFlow,MINIMUM',
-		    'VDEF:vehicleMax=vehicleFlow,MAXIMUM',
-		    'VDEF:vehicleLast=vehicleFlow,LAST',
-		    'VDEF:speedAvg=speed,AVERAGE',
-		    'VDEF:speedMin=speed,MINIMUM',
-		    'VDEF:speedMax=speed,MAXIMUM',
-		    'VDEF:speedLast=speed,LAST',
-		    'VDEF:occupancyAvg=occupancy,AVERAGE',
-		    'VDEF:occupancyMin=occupancy,MINIMUM',
-		    'VDEF:occupancyMax=occupancy,MAXIMUM',
-		    'VDEF:occupancyLast=occupancy,LAST',
-		    'LINE1:scaledFlow#0000FF:vehicleFlow    ',
-		    'LINE1:scaledSpeed#FF0000:speed    ',
-		    'LINE1:scaledOccupancy#00FF00:occupancy    \c',
-		    'GPRINT:vehicleAvg:avg %4.0lf0 veh/h\t',
-		    'GPRINT:vehicleMin:min %4.0lf0 veh/h\t',
-		    'GPRINT:vehicleMax:max %4.0lf0 veh/h\t',
-		    'GPRINT:vehicleLast:last %4.0lf0 veh/h\l',
-		    'GPRINT:speedAvg:avg %4.0lf km/h \t',
-		    'GPRINT:speedMin:min %4.0lf km/h \t',
-		    'GPRINT:speedMax:max %4.0lf km/h \t',
-		    'GPRINT:speedLast:last %4.0lf km/h \l',
-		    'GPRINT:occupancyAvg:avg %4.0lf %%\t',
-		    'GPRINT:occupancyMin:min %4.0lf %%\t',
-		    'GPRINT:occupancyMax:max %4.0lf %%\t',
-		    'GPRINT:occupancyLast:last %4.0lf %%     ')
+            '--end', 'now', '--start', "end-%s" % g_range,
+            '-E', '-N', '-h', height, '-l', '0', '-t',
+            sensor_name + ' | ' + str(time.strftime("%Y-%m-%d %H:%M", time.localtime())),
+            '-v', 'veh/h', '-X', '0', '-T' '20', '--right-axis', "%f:0" % scale,
+            '--right-axis-label', 'km/h | %',
+            "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
+            "DEF:speed=%s:speed:AVERAGE:step=360" % rrdfile,
+            "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % rrdfile,
+            'CDEF:scaledFlow=vehicleFlow,10,*',
+            "CDEF:scaledSpeed=speed,%f,/" % scale,
+            "CDEF:scaledOccupancy=occupancy,%f,/" % scale,
+            'VDEF:vehicleAvg=vehicleFlow,AVERAGE',
+            'VDEF:vehicleMin=vehicleFlow,MINIMUM',
+            'VDEF:vehicleMax=vehicleFlow,MAXIMUM',
+            'VDEF:vehicleLast=vehicleFlow,LAST',
+            'VDEF:speedAvg=speed,AVERAGE',
+            'VDEF:speedMin=speed,MINIMUM',
+            'VDEF:speedMax=speed,MAXIMUM',
+            'VDEF:speedLast=speed,LAST',
+            'VDEF:occupancyAvg=occupancy,AVERAGE',
+            'VDEF:occupancyMin=occupancy,MINIMUM',
+            'VDEF:occupancyMax=occupancy,MAXIMUM',
+            'VDEF:occupancyLast=occupancy,LAST',
+            'LINE1:scaledFlow#0000FF:vehicleFlow    ',
+            'LINE1:scaledSpeed#FF0000:speed    ',
+            'LINE1:scaledOccupancy#00FF00:occupancy    \c',
+            'GPRINT:vehicleAvg:avg %4.0lf0 veh/h\t',
+            'GPRINT:vehicleMin:min %4.0lf0 veh/h\t',
+            'GPRINT:vehicleMax:max %4.0lf0 veh/h\t',
+            'GPRINT:vehicleLast:last %4.0lf0 veh/h\l',
+            'GPRINT:speedAvg:avg %4.0lf km/h \t',
+            'GPRINT:speedMin:min %4.0lf km/h \t',
+            'GPRINT:speedMax:max %4.0lf km/h \t',
+            'GPRINT:speedLast:last %4.0lf km/h \l',
+            'GPRINT:occupancyAvg:avg %4.0lf %%\t',
+            'GPRINT:occupancyMin:min %4.0lf %%\t',
+            'GPRINT:occupancyMax:max %4.0lf %%\t',
+            'GPRINT:occupancyLast:last %4.0lf %%     ')
 
 def draw_graphs():
     for filename in os.listdir(args.workdir + '/rrd'):
-        if filename.endswith('.rrd'):
-            fullpath = args.workdir + '/rrd/' + filename;
-            m = re.search('(.*)\.rrd$', filename)
-            sensor_name = m.group(1).upper()
-            log(DEBUG, "[draw_graphs] drawing %s" % filename)
-            draw_graph(fullpath, sensor_name)
-            log(DEBUG, "[draw_graphs] gen_live_stats %s" % filename)
-            gen_live_stats(fullpath, sensor_name)
-        else:
+        if not filename.endswith('.rrd'):
             continue
+        fullpath = args.workdir + '/rrd/' + filename;
+        m = re.search('(.*)\.rrd$', filename)
+        sensor_name = m.group(1).upper()
+        log(DEBUG, "[draw_graphs] drawing %s" % filename)
+        draw_graph(fullpath, sensor_name)
 
 
 def main():
@@ -302,6 +313,7 @@ def main():
 
     if args.graph:
         draw_graphs()
+        gen_live_stats()
 
 if __name__ == "__main__":
     main()
