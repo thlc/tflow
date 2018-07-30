@@ -227,8 +227,8 @@ def gen_live_stats():
 
 def draw_graph(rrdfile, sensor_name):
     g_range = '2d'
-    height = '200'
-    width = '400'
+    height = '100'
+    width = '200'
     scale = 0.03
     rrdtool.graph(args.outputdir + "/graphs/%s.png" % sensor_name,
             '--end', 'now', '--start', "end-%s" % g_range,

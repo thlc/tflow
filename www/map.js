@@ -24,7 +24,7 @@ function handleCongestion(response) {
     if (data['speed'] > 70) {
       color = '#00aa00';
     } else if (data['speed'] > 40) {
-      color = '#774422';
+      color = '#e5d522';
     } else if (data['speed'] == 0) {
       color = '#dddddd';
     }
@@ -78,8 +78,15 @@ function initmap() {
   // set up the map
   map = new L.Map('mapid');
 
-  // create the tile layer with correct attribution
-  var osmUrl='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  // original OSM
+  //var osmUrl='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  // grayscale
+  var osmUrl='https://tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png';
+
+  // pure B&W
+  //var osmUrl='http://a.tile.stamen.com/toner/{z}/{x}/{y}.png';
+  
   var osmAttrib='Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors';
   var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 18, attribution: osmAttrib});        
 
