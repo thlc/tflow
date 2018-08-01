@@ -48,6 +48,23 @@ function makeSensor(map, sensor_name, lat, lon) {
   sensors[sensor_name] = c;
 }
 
+function updateCongestionCallback() {
+// perform an asynchronous AJAX request to the sensors data file.
+  var xmlhttp = new XMLHttpRequest();
+
+  xmlhttp.responseType = 'json';
+  xmlhttp.onreadystatechange = function () {
+    if (this.readyState == 4 && this.status == 200) {
+      handleCongestion(this.response);
+    } else {
+      console.log("unable to get sensors.json (readyState: " + this.readyState + ", status: " + this.status + ")");
+    }
+  };
+  xmlhttp.open("GET", "data/sensors-latest.json", true);
+  xmlhttp.send();
+}
+
+
 // sensors: array of Objects { "sensor_name": "lat,long" }
 function initSensors(map, sensors) {
   for (var i = 0; i < sensors.length; i++) {
@@ -59,19 +76,9 @@ function initSensors(map, sensors) {
     }
   }
 
-  // perform an asynchronous AJAX request to the sensors data file.
-  var xmlhttp = new XMLHttpRequest();
+  updateCongestionCallback();
 
-  xmlhttp.responseType = 'json';
-  xmlhttp.onreadystatechange = function () {
-    if (this.readyState == 4 && this.status == 200) {
-      handleCongestion(this.response);
-    } else {
-      console.log("unable to get sensors.json (readyState: " + this.readyState + ", status: " + this.status + ")");
-    }
-  };
-  xmlhttp.open("GET", "data/sensors.json", true);
-  xmlhttp.send();
+  setInterval(function() { updateCongestionCallback(); }, 10000);
 }
 
 function initmap() {

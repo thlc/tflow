@@ -197,7 +197,7 @@ def get_page_contents(url, ext):
 
 def gen_live_stats():
     i = 0
-    f = open(args.outputdir + '/data/sensors.json', 'w') or die("unable to open %s/data/sensors.json" % args.outputdir)
+    f = open(args.outputdir + '/data/sensors-latest.json', 'w') or die("unable to open %s/data/sensors.json" % args.outputdir)
     f.write('{ "sensors": [\n')
     d = os.listdir(args.workdir + '/rrd')
 
