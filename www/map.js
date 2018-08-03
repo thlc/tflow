@@ -40,12 +40,14 @@ function handleCongestion(response) {
     flow = data['vehicleFlow']
 
     if (speed > 0 && occ > 0 && flow > 0) {
-      speed_weight = make_congestion_index(speed, 20, 90);
-      occ_weight   = make_congestion_index(occ, 7, 20);
+      speed_weight = make_congestion_index(speed, 30, 90);
+      occ_weight   = make_congestion_index(occ, 20, 7);
 
       congestion_factor = (speed_weight + occ_weight) / 2
       if (congestion_factor > 100)
 	congestion_factor = 100;
+      if (congestion_factor < 0)
+	congestion_factor = 0;
 
       // remap it to 0-255
       congestion_factor = congestion_factor * 2.5;
@@ -67,9 +69,9 @@ function handleCongestion(response) {
 function makeSensor(map, sensor_name, lat, lon) {
   var pos = new L.LatLng(lat, lon);
   var c = new L.circle(pos, { "radius": 20, "color": '#eeeeee', "opacity": 0.2 })
-  c.bindPopup("<img src=\"/~thomas/tflow/graphs/" + sensor_name + ".png\"/>");
-  c.on('mouseover', function(e) { this.openPopup(); });
-  c.on('mouseout',  function(e) { this.closePopup(); });
+  c.bindPopup("<img src=\"/~thomas/tflow/graphs/" + sensor_name + ".png\"/>", { "keepInView": "true", "clocseOnClick": "true", "minWidth": "400px" });
+  c.on('onclick', function(e) { this.openPopup(); });
+  //c.on('mouseout',  function(e) { this.closePopup(); });
   c.addTo(map);
   // store a reference of the object to update the color (async)
   sensors[sensor_name] = c;
