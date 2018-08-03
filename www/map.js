@@ -50,7 +50,7 @@ function handleCongestion(response) {
     flow = data['vehicleFlow']
 
     if (speed > 0 && occ > 0 && flow > 0) {
-      speed_weight = make_congestion_index(speed, 30, 90);
+      speed_weight = make_congestion_index(speed, 30, 80);
       occ_weight   = make_congestion_index(occ, 20, 7);
 
       congestion_factor = (speed_weight + occ_weight) / 2

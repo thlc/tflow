@@ -97,6 +97,7 @@ def init_rrd(path, ts_start):
                         'DS:occupancy:GAUGE:360:0:100',
                         'DS:speed:GAUGE:360:0:200',
                         'RRA:AVERAGE:0.8:1:240',
+                        'RRA:AVERAGE:0.8:2:800',
                         'RRA:AVERAGE:0.8:10:8100')
 
 def update_rrd(sensor, ts, flow, occupancy, speed):
@@ -226,19 +227,19 @@ def gen_live_stats():
     f.close()
 
 def draw_graph(rrdfile, sensor_name):
-    g_range = '2d'
+    g_range = '24h'
     height = '100'
     width = '200'
     scale = 0.03
     rrdtool.graph(args.outputdir + "/graphs/%s.png" % sensor_name,
             '--end', 'now', '--start', "end-%s" % g_range,
-            '-E', '-N', '-h', height, '-l', '0', '-t',
+            '-E', '-h', height, '-l', '0', '-t',
             sensor_name + ' | ' + str(time.strftime("%Y-%m-%d %H:%M", time.localtime())),
             '-v', 'veh/h', '-X', '0', '-T' '20', '--right-axis', "%f:0" % scale,
             '--right-axis-label', 'km/h | %',
-            "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE:step=360" % rrdfile,
-            "DEF:speed=%s:speed:AVERAGE:step=360" % rrdfile,
-            "DEF:occupancy=%s:occupancy:AVERAGE:step=360" % rrdfile,
+            "DEF:vehicleFlow=%s:vehicleFlow:AVERAGE" % rrdfile,
+            "DEF:speed=%s:speed:AVERAGE" % rrdfile,
+            "DEF:occupancy=%s:occupancy:AVERAGE" % rrdfile,
             'CDEF:scaledFlow=vehicleFlow,10,*',
             "CDEF:scaledSpeed=speed,%f,/" % scale,
             "CDEF:scaledOccupancy=occupancy,%f,/" % scale,
@@ -302,7 +303,6 @@ def main():
 
     if args.init:
         init_workdir()
-        sys.exit(0)
 
     if not os.path.isdir(args.workdir):
         log("error: %s doesn't exist" % args.workdir)
