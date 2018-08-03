@@ -6,6 +6,27 @@ var plotlayers=[];
 // holds a reference to each Circle
 var sensors = new Object();
 
+
+function dec2hex(d) {
+  if (d > 15) {
+    return d.toString(16);
+  } else {
+    return "0" + d.toString(16);
+  }
+}
+
+function rgb(r, g, b)
+{
+  return "#" + dec2hex(r) + dec2hex(g) + dec2hex(b);
+}
+
+// an index is between 0-100.
+// 0 is free flowing, 100 is congested.
+function make_congestion_index(value, congested_thr, freeflow_thr) {
+  idx = ((value - freeflow_thr) * 100.0) / (congested_thr - freeflow_thr);
+  return Math.floor(idx);
+}
+
 function handleCongestion(response) {
   var color;
   var data;
@@ -14,19 +35,25 @@ function handleCongestion(response) {
     data = response['sensors'][key];
     sensor_name = data['sensorName'];
 
-    if (data['occupancy'] > 10) {
-      color = '#ff0000';
-    } else if (data['occupancy'] > 5) {
-      color = '#ffff00';
-    }
+    occ = data['occupancy']
+    speed = data['speed']
+    flow = data['vehicleFlow']
 
-    // actual speed takes precedence over occupancy
-    if (data['speed'] > 70) {
-      color = '#00aa00';
-    } else if (data['speed'] > 40) {
-      color = '#e5d522';
-    } else if (data['speed'] == 0) {
-      color = '#dddddd';
+    if (speed > 0 && occ > 0 && flow > 0) {
+      speed_weight = make_congestion_index(speed, 20, 90);
+      occ_weight   = make_congestion_index(occ, 7, 20);
+
+      congestion_factor = (speed_weight + occ_weight) / 2
+      if (congestion_factor > 100)
+	congestion_factor = 100;
+
+      // remap it to 0-255
+      congestion_factor = congestion_factor * 2.5;
+
+      color = rgb(Math.floor(congestion_factor), Math.floor(255 - congestion_factor), 0);
+      console.log("sensor[" + sensor_name + "] cong[" + congestion_factor + "] color[" + color + "]");
+    } else {
+      color = '#eeeeee';
     }
 
     if (typeof sensors[sensor_name] != 'undefined') {
