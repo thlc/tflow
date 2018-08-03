@@ -15,16 +15,26 @@ function dec2hex(d) {
   }
 }
 
+function normalize(input, low, high) {
+  if (input < low) return low;
+  if (input > high) return high;
+  return input;
+}
+
+// input range: 0-255
 function rgb(r, g, b)
 {
-  return "#" + dec2hex(r) + dec2hex(g) + dec2hex(b);
+  return "#" + dec2hex(normalize(r, 0, 255)) + dec2hex(normalize(g, 0, 255)) + dec2hex(normalize(b, 0, 255));
 }
 
 // an index is between 0-100.
 // 0 is free flowing, 100 is congested.
 function make_congestion_index(value, congested_thr, freeflow_thr) {
-  idx = ((value - freeflow_thr) * 100.0) / (congested_thr - freeflow_thr);
-  return Math.floor(idx);
+  return (remap_range(value, freeflow_thr, congested_thr, 0, 100));
+}
+
+function remap_range(value, low1, high1, low2, high2) {
+  return Math.floor(low2 + (value - low1) * (high2 - low2) / (high1 - low1));
 }
 
 function handleCongestion(response) {
@@ -50,9 +60,15 @@ function handleCongestion(response) {
 	congestion_factor = 0;
 
       // remap it to 0-255
-      congestion_factor = congestion_factor * 2.5;
+      congestion_factor = Math.floor(congestion_factor);
 
-      color = rgb(Math.floor(congestion_factor), Math.floor(255 - congestion_factor), 0);
+      // yellow offset:
+      // factor: 0   50   100
+      // rgb:    0   100   0
+      //               .-------------- 0-1 -------------------------.
+      yellow_factor = (1 - (Math.abs(50 - congestion_factor) / 50.0));
+      yellow_factor = remap_range(yellow_factor, 0, 1, 0, 255);
+      color = rgb(remap_range(congestion_factor, 0, 100, 0, 255) + yellow_factor, remap_range(congestion_factor, 0, 100, 255, 0) + yellow_factor, 0);
       console.log("sensor[" + sensor_name + "] cong[" + congestion_factor + "] color[" + color + "]");
     } else {
       color = '#eeeeee';

@@ -516,7 +516,7 @@
         </Point>
       </Placemark>
       <Placemark>
-        <name>MM413.I2</name>
+        <name>MM413.J2</name>
         <styleUrl>#icon-503-4186F0-labelson-nodesc</styleUrl>
         <Point>
           <coordinates>
@@ -525,7 +525,7 @@
         </Point>
       </Placemark>
       <Placemark>
-        <name>MM413.I1</name>
+        <name>MM413.J1</name>
         <styleUrl>#icon-503-4186F0-labelson-nodesc</styleUrl>
         <Point>
           <coordinates>
@@ -1811,6 +1811,24 @@
         <Point>
           <coordinates>
             5.4070598,43.4657549,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MM113.Y1</name>
+        <styleUrl>#icon-503-4186F0-labelson-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            5.4071228,43.4932255,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MM113.Y2</name>
+        <styleUrl>#icon-503-4186F0-labelson-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            5.4068613,43.4932177,0
           </coordinates>
         </Point>
       </Placemark>
